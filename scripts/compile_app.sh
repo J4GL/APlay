@@ -160,6 +160,12 @@ with open(dest, 'wb') as f:
 EOF
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
+# impl: ICON-001 rule 5 — a missing icon fails the build loudly, never a silent
+# icon-less bundle (ICON-001-S1).
+ICNS="$ROOT/Sources/Play/Resources/AppIcon.icns"
+[ -f "$ICNS" ] || die "no app icon at $ICNS — run scripts/make_app_icon.sh"
+cp "$ICNS" "$APP/Contents/Resources/AppIcon.icns"
+
 # impl: VLC-001 rule 7 — dylibs + versioned symlinks, 133 plugins
 mkdir -p "$APP/Contents/Frameworks" "$APP/Contents/PlugIns/vlc"
 cp -a "$ROOT/Vendor/libvlc/lib/." "$APP/Contents/Frameworks/"

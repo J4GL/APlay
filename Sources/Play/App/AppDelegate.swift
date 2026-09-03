@@ -41,6 +41,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pendingQueueFailures: [(MediaFailure, URL)] = []
     private var queueFlushScheduled = false
     private var queueFullyFailed = false
+    /// impl: PLAY-004 — the resume-position store, its coordinator, and toast.
+    private var resumeStore: ResumeStore?
+    private var resumeCoordinator: ResumeCoordinator?
+    private var resumeToast: ResumeToast?
     /// impl: PREF-001 rules 9, 14 — the stored preference, and the window that
     /// edits it. Both live for the whole session.
     private var preferences: TrackPreferencesStore?
@@ -182,6 +186,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let transport = TransportController(player: player, state: state)
         let seeker = SeekController(player: player, state: state)
+
+        // impl: PLAY-004 — per-file resume position: store, coordinator, toast.
+        let resumeStore = ResumeStore()
+        let resumeCoordinator = ResumeCoordinator(store: resumeStore, state: state, seeker: seeker)
+        resumeCoordinator.currentMrlHash = { [weak opener] in opener?.currentMrlHash }
+        state.onPlayingChanged = { [weak resumeCoordinator] isPlaying in
+            resumeCoordinator?.setTicking(isPlaying)
+        }
+        state.onEndedForResume = { [weak self, weak resumeCoordinator] in
+            resumeCoordinator?.handleEnded(mrlHash: self?.opener?.currentMrlHash)
+        }
+        transport.resumeCoordinator = resumeCoordinator
+        seeker.onSeekOccurred = { [weak resumeCoordinator] in resumeCoordinator?.noteSeekOccurred() }
+        opener.resumeCoordinator = resumeCoordinator
+        self.resumeStore = resumeStore
+        self.resumeCoordinator = resumeCoordinator
+
         let volume = VolumeController(player: player)
         let fullscreen = FullscreenController(window: window, contentRoot: contentRoot ?? videoView)
         geometryLog.fullscreen = fullscreen
@@ -324,6 +345,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ])
         }
         self.failureBanner = banner
+
+        // impl: PLAY-004 rule 7 — top, distinct from the readout's lower
+        // third and the HUD's bottom bar.
+        let toast = ResumeToast()
+        contentRoot?.addSubview(toast)
+        if let contentRoot {
+            NSLayoutConstraint.activate([
+                toast.centerXAnchor.constraint(equalTo: contentRoot.centerXAnchor),
+                toast.topAnchor.constraint(equalTo: contentRoot.topAnchor, constant: 16),
+            ])
+        }
+        resumeCoordinator?.onOffer = { [weak toast] record in toast?.show(record) }
+        resumeCoordinator?.onDismissRequested = { [weak toast] reason in toast?.dismiss(reason: reason) }
+        resumeCoordinator?.onAccepted = { [weak toast] in toast?.hideForAcceptance() }
+        toast.onResume = { [weak self] record in self?.resumeCoordinator?.handleAccepted(record: record) }
+        toast.onDismiss = { [weak self] reason in self?.resumeCoordinator?.handleDismissed(reason: reason) }
+        self.resumeToast = toast
 
         let autoHide = AutoHideController()
         // impl: CTRL-001 rules 4-5 — fade in 150 ms, out 300 ms.
@@ -509,6 +547,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// impl: VLC-002 rule 3 — detach → stop → release player → release instance.
     func applicationWillTerminate(_ notification: Notification) {
         state.releaseSleepAssertionForTermination()
+        resumeCoordinator?.saveCurrent(reason: "terminate")
         opener?.shutdown()
         player?.shutdown()
         VLCRuntime.shared.shutdown()

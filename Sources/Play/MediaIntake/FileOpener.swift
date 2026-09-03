@@ -33,6 +33,14 @@ final class FileOpener {
     /// currently loading.
     private let openTimeout: OpenTimeout
 
+    /// impl: PLAY-004 rules 5, 7 — the item this instance currently has
+    /// loaded, captured independently of `Queue.currentIndex`, which already
+    /// points at the *incoming* item by the time `openSingle` runs.
+    private(set) var currentMrlHash: String?
+
+    /// impl: PLAY-004 rules 5, 7 — set by AppDelegate.
+    var resumeCoordinator: ResumeCoordinator?
+
     /// The reason that queued the current batch, carried onto every item it
     /// contains: an auto-advance within a dropped folder is still a drop.
     private var batchReason: Reason = .commandLine
@@ -51,6 +59,12 @@ final class FileOpener {
         self.openTimeout = OpenTimeout(state: state)
         openTimeout.onTimeout = { [weak self] url, index in
             self?.failFromTimeout(url: url, index: index)
+        }
+        // impl: PLAY-004 rule 7 — offer a stored record once the incoming
+        // item's length is known.
+        state.onLengthKnown = { [weak self] lengthMs in
+            guard let self else { return }
+            resumeCoordinator?.considerOffering(mrlHash: currentMrlHash, lengthMs: lengthMs)
         }
     }
 
@@ -142,6 +156,14 @@ final class FileOpener {
         releaseScopedAccess()
         if started { scopedURL = url }
 
+        // impl: PLAY-004 rule 5 — the outgoing item's position, captured
+        // while PlaybackState still holds it (transition(to: .opening) below
+        // zeroes it).
+        if let outgoing = currentMrlHash {
+            resumeCoordinator?.saveOnMediaChange(
+                mrlHash: outgoing, positionMs: state.positionMs, lengthMs: state.lengthMs)
+        }
+
         guard player.setMedia(url: url) else {
             fail(.decodeFailed, url)
             return
@@ -153,6 +175,10 @@ final class FileOpener {
         // The item is loaded, so a later, unrelated failure must not be
         // attributed to it (rule 8 marks rows by this index).
         loadingIndex = nil
+        // impl: PLAY-004 rules 5, 8 — this is now the current item; any
+        // visible resume toast (for the outgoing item) dismisses.
+        currentMrlHash = PathRedactor.mrlHash(url)
+        resumeCoordinator?.mediaWillChange()
         // impl: TRACK-001 rule 10 — after the media is set, never before.
         attachSidecars(for: url)
     }

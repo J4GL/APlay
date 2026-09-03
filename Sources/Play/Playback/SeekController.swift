@@ -20,6 +20,10 @@ final class SeekController {
 
     private(set) var scrubPositionMs: Int?
 
+    /// impl: PLAY-004 rule 8 — set by AppDelegate; "any seek" dismisses a
+    /// visible resume toast.
+    var onSeekOccurred: (() -> Void)?
+
     init(player: MediaPlayer, state: PlaybackState) {
         self.player = player
         self.state = state
@@ -34,6 +38,7 @@ final class SeekController {
     /// impl: PLAY-002 rule 5 — a click on the bar seeks there immediately.
     func seek(toMs target: Int, element: String) {
         guard canSeek(element: element) else { return }
+        onSeekOccurred?()
         let clamped = clamp(target)
         log(.playbackSeekClick, .info, [
             "fromMs": state.positionMs, "toMs": clamped,
@@ -46,6 +51,7 @@ final class SeekController {
     /// impl: PLAY-002 rule 9 — keyboard nudges clamp and never wrap.
     func nudge(byMs delta: Int, element: String) {
         guard canSeek(element: element) else { return }
+        onSeekOccurred?()
         let clamped = clamp(state.positionMs + delta)
         log(.playbackSeekKeyboard, .info, [
             "deltaMs": delta, "fromMs": state.positionMs, "toMs": clamped,
@@ -61,6 +67,7 @@ final class SeekController {
     /// leave `status` alone: the user did not press pause.
     func beginScrub() {
         guard canSeek(element: A11yID.hudSeekBar.rawValue) else { return }
+        onSeekOccurred?()
         scrubPositionMs = state.positionMs
         if state.status == .playing {
             resumeAfterScrub = true

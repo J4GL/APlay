@@ -78,7 +78,7 @@ Running them needs the XCTest/XCUITest runners, which ship only with full Xcode 
 | Menu bar (CTRL-004), language preferences (PREF-001), drag-anywhere (WIN-001 r9) | **built** |
 | Aspect-ratio lock — resizing never changes the picture's shape (WIN-003 r5, r13-15) | **built** |
 | Failure banner (MEDIA-002 r7, r9-11) | **built** |
-| Resume position (PLAY-004) | not started |
+| Resume position (PLAY-004) | **built** |
 | Opening size and geometry persistence (WIN-003 r3-4, r8-11) | not started |
 | Notarised distribution (NOTARY-001) | **built** — signed, notarized, stapled DMG on [GitHub Releases](https://github.com/J4GL/APlay/releases) |
 

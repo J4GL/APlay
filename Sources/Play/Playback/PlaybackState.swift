@@ -54,6 +54,23 @@ final class PlaybackState {
     /// `.idle`, mirroring `onEndReached`'s ordering.
     var onEncounteredError: (() -> Void)?
 
+    /// impl: PLAY-004 rule 5 — set by AppDelegate to ResumeCoordinator; fired
+    /// only on playing↔not-playing edges, not every `onChange`, so a ticker
+    /// can start/stop off it without its own status bookkeeping.
+    var onPlayingChanged: ((Bool) -> Void)?
+
+    /// impl: PLAY-004 rule 7 — set by AppDelegate; fired once per media, the
+    /// first time a nonzero length arrives. libvlc can refine `lengthChanged`
+    /// more than once as duration estimates settle; only the first firing
+    /// matters for offering a resume record.
+    var onLengthKnown: ((Int) -> Void)?
+    private var lengthReportedForCurrentMedia = false
+
+    /// impl: PLAY-004 rule 5 — set by AppDelegate to ResumeCoordinator; fired
+    /// from `handleEndReached()`, before `onEndReached?()` — a film finished
+    /// clears its resume point.
+    var onEndedForResume: (() -> Void)?
+
     /// impl: PLAY-001 rule 10 — the sleep-prevention token, held only while playing.
     private var sleepToken: NSObjectProtocol?
 
@@ -78,6 +95,10 @@ final class PlaybackState {
             onChange?()
         case .lengthChanged(let ms):
             lengthMs = ms
+            if !lengthReportedForCurrentMedia, ms > 0 {
+                lengthReportedForCurrentMedia = true
+                onLengthKnown?(ms)
+            }
             onChange?()
         case .seekableChanged(let s):
             isSeekable = s
@@ -104,6 +125,9 @@ final class PlaybackState {
     private func handleEndReached() {
         log(.playbackEnded, .info, ["positionMs": positionMs, "lengthMs": lengthMs])
         transition(to: .ended)
+        // impl: PLAY-004 rule 5 — a film finished clears its resume point,
+        // ahead of the queue asking for a successor.
+        onEndedForResume?()
         onEndReached?()
     }
 
@@ -139,9 +163,15 @@ final class PlaybackState {
             // "past 3 s" branch and restarted B instead of going back to A.
             positionMs = 0
             lengthMs = 0
+            // impl: PLAY-004 rule 7 — reset alongside the two resets above; the
+            // next media gets its own one-shot length-known notification.
+            lengthReportedForCurrentMedia = false
             onMediaChanged?()
         }
         updateSleepAssertion()
+        if (from == .playing) != (next == .playing) {
+            onPlayingChanged?(next == .playing)
+        }
         log(.playbackStateChanged, .info, [
             "from": from.name, "to": next.name, "positionMs": positionMs,
         ])

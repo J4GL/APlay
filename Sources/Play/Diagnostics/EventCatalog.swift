@@ -83,6 +83,15 @@ public enum LogEvent: String, Sendable {
     case playbackVolumeChanged = "playback.volume.changed"
     case playbackMuteChanged   = "playback.mute.changed"
 
+    // resume / PLAY-004
+    case playbackResumeSaved     = "playback.resume.saved"
+    case playbackResumeOffered   = "playback.resume.offered"
+    case playbackResumeAccepted  = "playback.resume.accepted"
+    case playbackResumeDismissed = "playback.resume.dismissed"
+    case playbackResumeSkipped   = "playback.resume.skipped"
+    case playbackResumeCleared   = "playback.resume.cleared"
+    case playbackResumeStoreReset = "playback.resume.storeReset"
+
     // tracks / TRACK-001 rule 15
     case tracksSubtitleListChanged    = "tracks.subtitle.listChanged"
     case tracksSubtitleSelected       = "tracks.subtitle.selected"

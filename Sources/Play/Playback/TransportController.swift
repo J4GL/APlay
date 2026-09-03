@@ -11,6 +11,10 @@ final class TransportController {
     private let player: MediaPlayer
     private let state: PlaybackState
 
+    /// impl: PLAY-004 rule 5 — set by AppDelegate; a pause saves the position
+    /// immediately rather than waiting for the next ticker tick.
+    var resumeCoordinator: ResumeCoordinator?
+
     init(player: MediaPlayer, state: PlaybackState) {
         self.player = player
         self.state = state
@@ -65,6 +69,7 @@ final class TransportController {
             "positionMs": state.positionMs,
         ])
         player.pause()
+        resumeCoordinator?.saveCurrent(reason: "pause")
     }
 
     /// impl: PLAY-001 rule 7 — reachable only by closing the current item (⌘.).

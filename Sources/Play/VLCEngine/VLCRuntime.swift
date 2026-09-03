@@ -14,13 +14,13 @@ final class VLCRuntime {
         var message: String {
             switch self {
             case .pluginDirMissing:
-                "Play's video engine is missing from the app bundle."
+                "APlay's video engine is missing from the app bundle."
             case .pluginDirEmpty:
-                "Play's video engine folder is empty."
+                "APlay's video engine folder is empty."
             case .libvlcNewReturnedNull:
-                "Play's video engine failed to start."
+                "APlay's video engine failed to start."
             case .libraryValidationBlocked:
-                "macOS blocked Play's video engine from loading."
+                "macOS blocked APlay's video engine from loading."
             }
         }
     }

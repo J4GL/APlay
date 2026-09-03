@@ -41,7 +41,7 @@ public final class EventLog: @unchecked Sendable {
         #endif
 
         let dir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Logs/Play", isDirectory: true)
+            .appendingPathComponent("Library/Logs/APlay", isDirectory: true)
         do {
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             let stamp = Self.basicStamp(Date())

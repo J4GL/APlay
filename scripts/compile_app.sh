@@ -22,7 +22,7 @@ ROOT="$PWD"
 CONFIG="${CONFIG:-Debug}"
 DERIVED="$ROOT/${DERIVED:-build}"
 PRODUCTS="$DERIVED/Build/Products/$CONFIG"
-APP="$PRODUCTS/Play.app"
+APP="$PRODUCTS/APlay.app"
 IDENTITY="${IDENTITY:-Apple Development}"
 ENTITLEMENTS="${ENTITLEMENTS:-$ROOT/Play.entitlements}"
 COMPILE_TIMEOUT="${COMPILE_TIMEOUT:-600}"
@@ -105,8 +105,8 @@ timeout "$COMPILE_TIMEOUT" swiftc "${SRCS[@]}" \
 # `mv` onto an existing directory nests instead of replacing (seen: rebuild
 # fails with "Directory not empty"). Untouched when no fresh dSYM was produced.
 if [ -d "$APP/Contents/MacOS/Play.dSYM" ]; then
-  rm -rf "$PRODUCTS/Play.app.dSYM"
-  mv "$APP/Contents/MacOS/Play.dSYM" "$PRODUCTS/Play.app.dSYM"
+  rm -rf "$PRODUCTS/APlay.app.dSYM"
+  mv "$APP/Contents/MacOS/Play.dSYM" "$PRODUCTS/APlay.app.dSYM"
 fi
 if [ -d "$STAGE/fw/PlayA11y.framework/Versions/A/PlayA11y.dSYM" ]; then
   rm -rf "$PRODUCTS/PlayA11y.framework.dSYM"
@@ -174,7 +174,7 @@ cp -a "$STAGE/fw/PlayA11y.framework" "$APP/Contents/Frameworks/"
 echo "payload: $(ls "$APP/Contents/PlugIns/vlc" | wc -l | tr -d ' ') plugins"
 
 echo "compile_app: signing (VLC-001 rule 10, inside out)"
-export TARGET_BUILD_DIR="$PRODUCTS" CONTENTS_FOLDER_PATH="Play.app/Contents"
+export TARGET_BUILD_DIR="$PRODUCTS" CONTENTS_FOLDER_PATH="APlay.app/Contents"
 export CODE_SIGN_IDENTITY="$IDENTITY"
 TS="${PLAY_TIMESTAMP_FLAG:---timestamp=none}"
 timeout "$SIGN_TIMEOUT" ./scripts/sign_vlc_payload.sh

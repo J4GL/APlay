@@ -64,17 +64,17 @@ final class MainMenu: NSObject, NSMenuDelegate, NSMenuItemValidation {
     }
 
     /// impl: CTRL-004 rule 2 — always first, and always the process name. The
-    /// transport menu is therefore called "Playback": two menus reading "Play"
+    /// transport menu is therefore called "Playback": two menus reading "APlay"
     /// in one bar is a defect, not a naming preference.
     private func applicationMenuItem() -> NSMenuItem {
-        let menu = NSMenu(title: "Play")
-        menu.addItem(withTitle: "About Play",
+        let menu = NSMenu(title: "APlay")
+        menu.addItem(withTitle: "About APlay",
                      action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
                      keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(item(.openSettings, "Settings…", key: ","))
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Hide Play",
+        menu.addItem(withTitle: "Hide APlay",
                      action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         let hideOthers = menu.addItem(withTitle: "Hide Others",
                                       action: #selector(NSApplication.hideOtherApplications(_:)),
@@ -83,7 +83,7 @@ final class MainMenu: NSObject, NSMenuDelegate, NSMenuItemValidation {
         menu.addItem(withTitle: "Show All",
                      action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
         menu.addItem(.separator())
-        menu.addItem(item(.quit, "Quit Play", key: "q"))
+        menu.addItem(item(.quit, "Quit APlay", key: "q"))
         return parent(menu)
     }
 

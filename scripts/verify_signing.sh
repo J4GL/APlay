@@ -18,10 +18,10 @@
 # always rejected by spctl, so requiring acceptance at step 7.3 would make the
 # pipeline unwinnable (seen: release.sh died at 7.3 with everything else green).
 #
-# Usage: verify_signing.sh <path-to-Play.app> [--require-developer-id] [--require-spctl]
+# Usage: verify_signing.sh <path-to-APlay.app> [--require-developer-id] [--require-spctl]
 set -uo pipefail
 
-APP="${1:?usage: verify_signing.sh <Play.app> [--require-developer-id] [--require-spctl]}"
+APP="${1:?usage: verify_signing.sh <APlay.app> [--require-developer-id] [--require-spctl]}"
 REQUIRE_DEVID=0
 REQUIRE_SPCTL=0
 for arg in "${@:2}"; do

@@ -1,9 +1,9 @@
 // impl: ICON-001-H1, ICON-001-S2 — the shipped icon, read from the running
-// Play.app bundle rather than re-derived, so a regenerated `.icns` that never
+// APlay.app bundle rather than re-derived, so a regenerated `.icns` that never
 // made it into the bundle (or a build that silently dropped it) is a red test,
 // not a faded triangle discovered in the Dock. PlayUnitTests is host-hosted
-// (TEST_HOST = Play.app, XcodeGen's default for a unit-test bundle depending on
-// an app target), so `Bundle.main` here is Play.app's own bundle.
+// (TEST_HOST = APlay.app, XcodeGen's default for a unit-test bundle depending
+// on an app target), so `Bundle.main` here is APlay.app's own bundle.
 
 import XCTest
 @testable import Play

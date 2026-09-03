@@ -57,8 +57,8 @@ targets:
     info:
       path: Sources/Play/Info.plist
       properties:
-        CFBundleName: Play
-        CFBundleDisplayName: Play
+        CFBundleName: APlay
+        CFBundleDisplayName: APlay
         CFBundleIconFile: AppIcon
         CFBundleShortVersionString: "0.1.0"
         CFBundleVersion: "1"
@@ -86,6 +86,15 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: gl.j4.Play
+        # impl: external rename to "APlay" — the product/display name only. The
+        # Xcode target, Swift module, PlayA11y, bundle id and test targets stay
+        # "Play" internally; only what ships (the .app filename, Finder/Dock,
+        # About/Hide/Quit) reads "APlay" (compile_app.sh does the equivalent by
+        # hand on the CLT driver, which is what actually builds on this Mac —
+        # this xcodegen path is unverified here, no Xcode/xcodegen installed).
+        PRODUCT_NAME: APlay
+        EXECUTABLE_NAME: Play
+        PRODUCT_MODULE_NAME: Play
         CODE_SIGN_IDENTITY: "Apple Development"
         OTHER_CODE_SIGN_FLAGS: "--timestamp=none"
         # impl: VLC-001 rule 8 — find the bundled dylibs at @rpath

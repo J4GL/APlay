@@ -417,7 +417,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let alert = NSAlert()
         alert.alertStyle = .critical
         alert.messageText = failure.message
-        alert.informativeText = "Play cannot start without its video engine."
+        alert.informativeText = "APlay cannot start without its video engine."
         alert.addButton(withTitle: "Quit")
         alert.window.setAccessibilityIdentifier(A11yID.alertBootstrapFailure.rawValue)
         alert.runModal()

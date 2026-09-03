@@ -1,4 +1,4 @@
-# Play
+# APlay
 
 A borderless, minimalist video player for macOS, built directly on **libvlc**.
 
@@ -12,10 +12,10 @@ it, with controls that fade in when you move the mouse and disappear when you do
 
 VLC's decoding stack is the reason this exists rather than being a thin wrapper over AVKit. It plays
 MKV, ASS/SSA subtitles, VobSub, and the codec-and-container combinations AVFoundation declines —
-the old files you actually have. `libvlc` is the C library underneath VLC.app, and Play links it
+the old files you actually have. `libvlc` is the C library underneath VLC.app, and APlay links it
 directly.
 
-libvlc and its plugins are **bundled inside the app** (~83 MB), so Play runs on a Mac with no VLC
+libvlc and its plugins are **bundled inside the app** (~83 MB), so APlay runs on a Mac with no VLC
 installed.
 
 ## What it does
@@ -64,7 +64,7 @@ so it is not in version control. Only the headers are committed.
 ## Test
 
 E2E tests are XCUITest. They assert against two oracles: element-scoped screenshots, and a
-structured JSONL log at `~/Library/Logs/Play/`. Media fixtures are generated with `AVAssetWriter`
+structured JSONL log at `~/Library/Logs/APlay/`. Media fixtures are generated with `AVAssetWriter`
 and never committed — each fixture second is a known flat colour, which is what makes "did that seek
 land at 7 s?" answerable by looking at the picture.
 
@@ -86,9 +86,9 @@ Running them needs the XCTest/XCUITest runners, which ship only with full Xcode 
 
 ## Credits and licence
 
-Play is built on **libVLC** by the [VideoLAN](https://www.videolan.org) project — VLC 3.0.23
-"Vetinari". libVLC is licensed under the **LGPL v2.1 or later**; Play links it dynamically and ships
+APlay is built on **libVLC** by the [VideoLAN](https://www.videolan.org) project — VLC 3.0.23
+"Vetinari". libVLC is licensed under the **LGPL v2.1 or later**; APlay links it dynamically and ships
 the libraries unmodified. VLC's source is at <https://code.videolan.org/videolan/vlc>, and the LGPL
 text at <https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html>.
 
-Play's own code is licensed under the same terms — **LGPL v2.1 or later** (see [`LICENSE`](LICENSE)).
+APlay's own code is licensed under the same terms — **LGPL v2.1 or later** (see [`LICENSE`](LICENSE)).

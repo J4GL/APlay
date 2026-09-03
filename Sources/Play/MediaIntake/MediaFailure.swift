@@ -13,11 +13,11 @@ enum MediaFailure: String, Error, Equatable, Sendable {
     var message: String {
         switch self {
         case .fileMissing:          "That file isn't there any more."
-        case .notReadable:          "Play doesn't have permission to read that file."
+        case .notReadable:          "APlay doesn't have permission to read that file."
         case .emptyFile:            "That file is empty."
-        case .unsupportedExtension: "Play doesn't open that kind of file."
+        case .unsupportedExtension: "APlay doesn't open that kind of file."
         case .noPlayableTrack:      "There's no video or audio in that file."
-        case .decodeFailed:         "Play couldn't decode that file."
+        case .decodeFailed:         "APlay couldn't decode that file."
         case .drmProtected:         "That file is copy-protected."
         }
     }
@@ -25,7 +25,7 @@ enum MediaFailure: String, Error, Equatable, Sendable {
     /// impl: MEDIA-002 rule 6 — `unsupportedExtension` is the one case whose
     /// message names the extension, so it is built rather than constant.
     func message(forExtension ext: String) -> String {
-        self == .unsupportedExtension ? "Play doesn't open .\(ext) files." : message
+        self == .unsupportedExtension ? "APlay doesn't open .\(ext) files." : message
     }
 
     var reason: String { rawValue }

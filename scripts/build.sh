@@ -10,7 +10,7 @@ ROOT="$PWD"
 CONFIG="${CONFIG:-Debug}"
 # `build/` is xcodebuild's own default output root, so a build from Xcode.app and
 # a build from this script land in the same place instead of leaving two copies
-# of Play.app at different ages.
+# of APlay.app at different ages.
 DERIVED="$ROOT/build"
 
 if [ ! -f "$ROOT/Vendor/libvlc/lib/libvlc.5.dylib" ]; then
@@ -38,8 +38,8 @@ else
   ./scripts/compile_app.sh "$@"
 fi
 
-APP="$DERIVED/Build/Products/$CONFIG/Play.app"
-[ -d "$APP" ] || { echo "build: FAILED — no Play.app at $APP" >&2; exit 1; }
+APP="$DERIVED/Build/Products/$CONFIG/APlay.app"
+[ -d "$APP" ] || { echo "build: FAILED — no APlay.app at $APP" >&2; exit 1; }
 
 echo
 ./scripts/verify_signing.sh "$APP"

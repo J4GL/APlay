@@ -20,7 +20,7 @@ final class SessionLog {
     /// out of `~/Library/Containers/gl.j4.PlayUITests.xctrunner` — so
     /// `homeDirectoryForCurrentUser` and `NSHomeDirectory()` both point at the
     /// container, while the app under test (not sandboxed) writes its log to the
-    /// real `~/Library/Logs/Play`. Reading the passwd entry is what bridges them.
+    /// real `~/Library/Logs/APlay`. Reading the passwd entry is what bridges them.
     static var realHome: URL {
         if let pw = getpwuid(getuid()), let dir = pw.pointee.pw_dir {
             return URL(fileURLWithPath: String(cString: dir))
@@ -31,7 +31,7 @@ final class SessionLog {
     /// Finds the session file the app under test just created. Called after
     /// `app.launch()`, with the timestamp taken immediately before it.
     static func newest(after launchedAt: Date, timeout: TimeInterval = 15) throws -> SessionLog {
-        let directory = realHome.appendingPathComponent("Library/Logs/Play", isDirectory: true)
+        let directory = realHome.appendingPathComponent("Library/Logs/APlay", isDirectory: true)
         let deadline = Date().addingTimeInterval(timeout)
 
         while Date() < deadline {

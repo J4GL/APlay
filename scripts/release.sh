@@ -107,13 +107,13 @@ echo "release: log: $LOG"
 
 # --- clean CLT-only build (NOTARY-001 rules 7.2, 12, 13) --------------------
 timeout "$BUILD_TIMEOUT" ./scripts/compile_app.sh
-APP="$ROOT/build/Build/Products/Release/Play.app"
-[ -d "$APP" ] || die "no Play.app at $APP"
+APP="$ROOT/build/Build/Products/Release/APlay.app"
+[ -d "$APP" ] || die "no APlay.app at $APP"
 
 # impl: NOTARY-001-S3 — get-task-allow is caught locally, before any upload.
 timeout "$SPCTL_TIMEOUT" codesign -d --entitlements - "$APP" > "$OUT/entitlements.plist"
 grep -q 'get-task-allow' "$OUT/entitlements.plist" \
-  && die "Play.app carries com.apple.security.get-task-allow, which notarisation rejects (NOTARY-001 rule 4). Nothing uploaded."
+  && die "APlay.app carries com.apple.security.get-task-allow, which notarisation rejects (NOTARY-001 rule 4). Nothing uploaded."
 
 # impl: NOTARY-001 rule 7.3 — identity gate before Apple is involved. The
 # timestamp half of 7.3 is enforced by forcing PLAY_TIMESTAMP_FLAG above plus
@@ -146,7 +146,7 @@ notarize() {
 }
 
 # --- zip → submit (NOTARY-001 rules 7.4, 7.5) --------------------------------
-ZIP="$OUT/Play-$VERSION.zip"
+ZIP="$OUT/APlay-$VERSION.zip"
 timeout "$DMG_TIMEOUT" ditto -c -k --keepParent "$APP" "$ZIP"
 notarize "$ZIP" "submit-$STAMP"
 
@@ -163,16 +163,16 @@ echo "$SPCTL_OUT" | grep -q 'accepted' && echo "$SPCTL_OUT" | grep -q 'Notarized
 # The DMG is its own notarisation object: stapling looks up the ticket issued
 # for the dmg itself, so it needs its own submission (seen: stapling a dmg
 # built from the stapled app fails with Error 65, "Record not found").
-# The image carries Play.app plus an Applications symlink for drag-and-drop
+# The image carries APlay.app plus an Applications symlink for drag-and-drop
 # install. ditto (not cp) stages the signed bundle so the ticket and xattrs
 # survive the copy; hdiutil preserves the symlink.
-DMG="$OUT/Play-$VERSION.dmg"
+DMG="$OUT/APlay-$VERSION.dmg"
 STAGE_DMG="$OUT/dmg-staging"
 rm -rf "$STAGE_DMG"
 mkdir -p "$STAGE_DMG"
-timeout "$DMG_TIMEOUT" ditto "$APP" "$STAGE_DMG/Play.app"
+timeout "$DMG_TIMEOUT" ditto "$APP" "$STAGE_DMG/APlay.app"
 ln -s /Applications "$STAGE_DMG/Applications"
-timeout "$DMG_TIMEOUT" hdiutil create -volname "Play $VERSION" \
+timeout "$DMG_TIMEOUT" hdiutil create -volname "APlay $VERSION" \
   -srcfolder "$STAGE_DMG" -ov -format UDZO "$DMG"
 rm -rf "$STAGE_DMG"
 notarize "$DMG" "submit-dmg-$STAMP"

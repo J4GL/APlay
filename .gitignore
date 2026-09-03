@@ -1,0 +1,41 @@
+# --- Vendored libvlc payload (~83 MB, reproducible via scripts/vendor_libvlc.sh) ---
+# Headers ARE committed (small, and they pin the API surface we compile against).
+Vendor/libvlc/lib/
+Vendor/libvlc/plugins/
+
+# --- Logs (rule: never commit log files) ---
+*.jsonl
+Logs/
+*.log
+
+# --- Generated Xcode project (source of truth is project.yml) ---
+*.xcodeproj/
+*.xcworkspace/
+DerivedData/
+build/
+.build/
+
+# --- Test artifacts ---
+Tests/Fixtures/Generated/
+*.xcresult
+TestResults/
+
+# --- Secrets ---
+*.p12
+*.mobileprovision
+.env
+.env.*
+!.env.example
+
+# --- macOS ---
+.DS_Store
+._*
+
+# --- Agent rules, specs and docs (local-only, never committed) ---
+AGENTS.md
+CLAUDE.md
+CODEX.md
+GEMINI.md
+.cursorrules
+specs/
+docs/

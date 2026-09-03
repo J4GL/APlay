@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!-- impl: NOTARY-001 rule 4 — release entitlements carry no get-task-allow
+     (notarisation rejects it). Deliberately an empty dict, like development,
+     so the delta stays exactly the four things rule 4 names. -->
+<dict/>
+</plist>

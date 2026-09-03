@@ -1,0 +1,158 @@
+# impl: VLC-001 rules 7-9 — bundle layout and signing
+# Source of truth for the Xcode project. Play.xcodeproj is generated and gitignored.
+name: Play
+options:
+  bundleIdPrefix: gl.j4
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    # impl: VLC-001 rule 9 — the user's Apple Developer identity
+    DEVELOPMENT_TEAM: V786D35WNB
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_HARDENED_RUNTIME: YES
+    ENABLE_APP_SANDBOX: NO
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    ALWAYS_SEARCH_USER_PATHS: NO
+    CLANG_ENABLE_MODULES: YES
+    ONLY_ACTIVE_ARCH: YES
+
+targets:
+  # ---------------------------------------------------------------------------
+  # impl: CTRL-003 rule 1 — identifiers in their own module so the UI test
+  # bundle can import them. A UI test target cannot @testable import the app.
+  # ---------------------------------------------------------------------------
+  PlayA11y:
+    type: framework
+    platform: macOS
+    sources: [Sources/PlayA11y]
+    # A macOS framework is unsignable without Versions/A/Resources/Info.plist:
+    # codesign reports "bundle format unrecognized, invalid, or unsuitable".
+    info:
+      path: Sources/PlayA11y/Info.plist
+      properties:
+        CFBundleName: PlayA11y
+        CFBundlePackageType: FMWK
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: gl.j4.PlayA11y
+        SKIP_INSTALL: NO
+        DYLIB_INSTALL_NAME_BASE: "@rpath"
+
+  Play:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/Play
+    dependencies:
+      - target: PlayA11y
+        embed: true
+    info:
+      path: Sources/Play/Info.plist
+      properties:
+        CFBundleName: Play
+        CFBundleDisplayName: Play
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        LSMinimumSystemVersion: "14.0"
+        NSHighResolutionCapable: true
+        LSApplicationCategoryType: public.app-category.video
+        # impl: MEDIA-002 rules 1, 4 — generated from FormatCatalog; viewer, not editor
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Video
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              [public.movie, public.video, public.mpeg-4, com.apple.quicktime-movie,
+               public.avi, org.matroska.mkv, public.3gpp, com.microsoft.windows-media-wmv]
+            CFBundleTypeExtensions:
+              [mp4, m4v, mov, mkv, avi, webm, flv, wmv, mpg, mpeg,
+               m2ts, mts, ts, vob, ogv, 3gp, divx, asf, rmvb]
+          - CFBundleTypeName: Subtitles
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            CFBundleTypeExtensions: [srt, ass, ssa, vtt, sub, idx]
+    entitlements:
+      path: Play.entitlements
+      properties: {}   # impl: VLC-001 rule 11 — deliberately empty; see VLC-001-H3
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: gl.j4.Play
+        CODE_SIGN_IDENTITY: "Apple Development"
+        OTHER_CODE_SIGN_FLAGS: "--timestamp=none"
+        # impl: VLC-001 rule 8 — find the bundled dylibs at @rpath
+        LD_RUNPATH_SEARCH_PATHS:
+          ["$(inherited)", "@executable_path/../Frameworks"]
+        # Swift <-> C interop for libvlc
+        SWIFT_OBJC_BRIDGING_HEADER: Sources/Play/Bridging/Play-Bridging-Header.h
+        HEADER_SEARCH_PATHS: ["$(SRCROOT)/Vendor/libvlc/include"]
+        LIBRARY_SEARCH_PATHS: ["$(SRCROOT)/Vendor/libvlc/lib"]
+        OTHER_LDFLAGS: ["-lvlc"]
+    preBuildScripts:
+      - name: "Vendor libvlc (no-op if present)"
+        script: |
+          if [ ! -f "$SRCROOT/Vendor/libvlc/lib/libvlc.5.dylib" ]; then
+            "$SRCROOT/scripts/vendor_libvlc.sh"
+          fi
+        basedOnDependencyAnalysis: false
+    postCompileScripts:
+      - name: "Copy libvlc payload"
+        script: |
+          set -euo pipefail
+          FW="$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH"
+          PI="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/PlugIns/vlc"
+          mkdir -p "$FW" "$PI"
+          # impl: VLC-001 rule 7 — dylibs + versioned symlinks
+          cp -a "$SRCROOT/Vendor/libvlc/lib/." "$FW/"
+          rsync -a --delete "$SRCROOT/Vendor/libvlc/plugins/" "$PI/"
+          echo "payload: $(ls "$PI" | wc -l | tr -d ' ') plugins"
+        basedOnDependencyAnalysis: false
+    postBuildScripts:
+      - name: "Sign libvlc payload (inside-out)"
+        script: '"$SRCROOT/scripts/sign_vlc_payload.sh"'
+        basedOnDependencyAnalysis: false
+
+  PlayUnitTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources: [Tests/PlayUnitTests, Tests/Fixtures]
+    dependencies:
+      - target: Play
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: gl.j4.PlayUnitTests
+        SWIFT_OBJC_BRIDGING_HEADER: Sources/Play/Bridging/Play-Bridging-Header.h
+        HEADER_SEARCH_PATHS: ["$(SRCROOT)/Vendor/libvlc/include"]
+
+  PlayUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources: [Tests/PlayUITests, Tests/Fixtures]
+    dependencies:
+      - target: Play
+      - target: PlayA11y
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: gl.j4.PlayUITests
+        TEST_TARGET_NAME: Play
+
+schemes:
+  Play:
+    build:
+      targets:
+        Play: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: false
+      targets: [PlayUnitTests, PlayUITests]

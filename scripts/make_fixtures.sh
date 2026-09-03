@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # impl: TEST-001 rule 1 — generate the deterministic media fixtures.
 #
-# Run before the suite (scripts/test.sh does this for you). Fixtures are cached
-# by filename and builder version, so a second run is a no-op.
+# Run before the suite (`xcodebuild test` needs full Xcode; there is no wrapper
+# script here — see README's Test section). Fixtures are cached by filename and
+# builder version, so a second run is a no-op.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

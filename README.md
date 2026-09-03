@@ -35,9 +35,9 @@ installed.
 - **Menu bar** — every command is discoverable in File / Playback / Audio / Subtitle / Window, with
   the ⌘ shortcuts shown beside them; the track menus list what the current file actually contains
 - **Language preferences** (⌘,) — an ordered list of two-letter language codes for audio and for
-  subtitles, kept separate, so you can watch in the original language and read your own. Each has a
-  name filter that breaks a tie between two tracks of the same language ("Français" versus
-  "Français forced"). The filter only *ranks*: it never causes a language to be skipped.
+  subtitles, kept separate, so you can watch in the original language and read your own.
+  **Each has a name filter that breaks a tie between two tracks of the same language** ("Français"
+  versus "Français forced"). The filter only *ranks*: it never causes a language to be skipped.
 
 Deliberately **not** included: playback speed, frame stepping, A-B loop, streaming, casting, or an
 equalizer. Subtitle typography (font, size, colour) is also out of scope, settings window or not.
@@ -63,18 +63,14 @@ so it is not in version control. Only the headers are committed.
 
 ## Test
 
-```bash
-scripts/test.sh
-```
-
 E2E tests are XCUITest. They assert against two oracles: element-scoped screenshots, and a
 structured JSONL log at `~/Library/Logs/Play/`. Media fixtures are generated with `AVAssetWriter`
 and never committed — each fixture second is a known flat colour, which is what makes "did that seek
 land at 7 s?" answerable by looking at the picture.
 
-```bash
-scripts/test.sh --scope PLAY-002
-```
+Running them needs the XCTest/XCUITest runners, which ship only with full Xcode (`xcodebuild test`)
+— not available from the Command Line Tools alone, so there is no test script in this checkout.
+`scripts/build.sh` and `scripts/make_fixtures.sh` work without Xcode.
 
 ## Project status
 
@@ -87,15 +83,6 @@ scripts/test.sh --scope PLAY-002
 | Resume position (PLAY-004), failure banner (MEDIA-002 r7) | not started |
 | Opening size and geometry persistence (WIN-003 r3-4, r8-11) | not started |
 | Notarised distribution (NOTARY-001) | blocked — needs a Developer ID certificate |
-
-Read [`specs/index.md`](specs/index.md) first; it indexes every feature and shows the dependency
-order. [`AGENTS.md`](AGENTS.md) holds the working rules and the architecture summary, and
-[`docs/call-graph.md`](docs/call-graph.md) shows the wiring as built — including a table of what is
-specified but not yet wired, so nothing there can be mistaken for dead code.
-
-```bash
-python3 scripts/lint_specs.py
-```
 
 ## Credits and licence
 

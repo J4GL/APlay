@@ -49,6 +49,11 @@ final class PlaybackState {
     /// .advanceAutomatically`. `EndReached` is the only thing that calls it.
     var onEndReached: (() -> Void)?
 
+    /// impl: MEDIA-002 rule 6/7 — set by AppDelegate; libvlc's own async decode
+    /// error for the *currently loaded* media. Fired after the transition to
+    /// `.idle`, mirroring `onEndReached`'s ordering.
+    var onEncounteredError: (() -> Void)?
+
     /// impl: PLAY-001 rule 10 — the sleep-prevention token, held only while playing.
     private var sleepToken: NSObjectProtocol?
 
@@ -63,7 +68,11 @@ final class PlaybackState {
         case .paused:           transition(to: .paused)
         case .stopped:          transition(to: .idle)
         case .endReached:       handleEndReached()
-        case .encounteredError: transition(to: .failed(.decodeFailed))
+        case .encounteredError:
+            // impl: MEDIA-002 rule 8 — the same target FileOpener.fail uses, so
+            // this path is never left in `.opening` either.
+            transition(to: .idle)
+            onEncounteredError?()
         case .timeChanged(let ms):
             positionMs = ms
             onChange?()

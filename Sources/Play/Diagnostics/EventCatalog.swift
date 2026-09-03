@@ -61,6 +61,8 @@ public enum LogEvent: String, Sendable {
     case mediaOpenRejectedDrag = "media.open.rejectedDrag"
     case mediaDragEntered     = "media.drag.entered"
     case mediaDragExited      = "media.drag.exited"
+    case mediaBannerShown     = "media.banner.shown"
+    case mediaBannerDismissed = "media.banner.dismissed"
 
     // playback / PLAY-001..003
     case playbackStateChanged = "playback.state.changed"

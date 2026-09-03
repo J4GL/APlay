@@ -123,7 +123,10 @@ final class QueueAdvancer {
             return
         }
         log(.playlistExhausted, .info, ["count": queue.items.count])
-        if !queue.items.isEmpty, queue.items.allSatisfy({ $0.status == .failed }) {
+        // impl: MEDIA-002 rule 10 — a "queue" of one ordinary failed file must
+        // not also trigger the all-failed summary; only a genuine multi-item
+        // queue can be "every item failed".
+        if queue.items.count > 1, queue.items.allSatisfy({ $0.status == .failed }) {
             onAllItemsFailed?()
         }
     }

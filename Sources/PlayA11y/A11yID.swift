@@ -61,7 +61,10 @@ public enum A11yID: String, CaseIterable, Sendable {
 
     // transient surfaces
     case toastResume              = "play.toast.resume"
+    case toastResumeAction        = "play.toast.resume.action"
+    case toastResumeDismiss       = "play.toast.resume.dismiss"
     case bannerMediaFailure       = "play.banner.mediaFailure"
+    case bannerMediaFailureDismiss = "play.banner.mediaFailure.dismiss"
     case alertBootstrapFailure    = "play.alert.bootstrapFailure"
     case overlaySubtitleDelay     = "play.overlay.subtitleDelayReadout"
 

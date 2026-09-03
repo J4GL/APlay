@@ -35,6 +35,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var delayReadout: TransientReadout?
     private var advancer: QueueAdvancer?
     private var queuePanel: QueueOverlayView?
+    /// impl: MEDIA-002 rules 7, 10 — the failure banner and the coalescing
+    /// state that turns a synchronous all-fail queue cascade into one summary.
+    private var failureBanner: FailureBanner?
+    private var pendingQueueFailures: [(MediaFailure, URL)] = []
+    private var queueFlushScheduled = false
+    private var queueFullyFailed = false
     /// impl: PREF-001 rules 9, 14 — the stored preference, and the window that
     /// edits it. Both live for the whole session.
     private var preferences: TrackPreferencesStore?
@@ -117,7 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let opener = FileOpener(player: player, state: state, queue: queue)
         opener.onFailure = { [weak self] failure, url in
-            self?.reportFailure(failure, url)
+            self?.reportMediaFailure(failure, url, coalesce: true)
         }
 
         // impl: PREF-001 rules 9, 12 — read before the track controllers exist,
@@ -142,7 +148,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let subtitleDelay = SubtitleDelayController(player: player, subtitles: subtitles)
         subtitles.onFailure = { [weak self] failure, url in
-            self?.reportFailure(failure, url)
+            // impl: MEDIA-002 rule 10 — a subtitle-attach failure has no queue
+            // index and must always present immediately, never batched into a
+            // queue-cascade summary.
+            self?.reportMediaFailure(failure, url, coalesce: false)
         }
         catalog.onSubtitlesChanged = { [weak self] in
             subtitles.catalogChanged()
@@ -191,6 +200,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         advancer.onAllItemsFailed = { [weak self] in self?.reportQueueExhausted() }
         opener.advancer = advancer
         state.onEndReached = { advancer.advanceAutomatically() }
+        // impl: MEDIA-002 rules 6-7 — libvlc's own async decode error for the
+        // media currently loaded, distinct from FileOpener's preflight failures.
+        state.onEncounteredError = { [weak self] in self?.handleEncounteredError() }
         // impl: LIST-001 rule 12 / LIST-002 rules 5-6 — the HUD's queue controls
         // and the panel's rows are both redrawn from the model, never patched.
         queue.onChange = { [weak self] in
@@ -300,6 +312,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         subtitleDelay.onReadout = { [weak readout] text in readout?.show(text) }
         self.delayReadout = readout
 
+        // impl: MEDIA-002 rule 7 — topmost z-order; a failure must never be
+        // occluded by the HUD or the queue panel.
+        let banner = FailureBanner()
+        contentRoot?.addSubview(banner)
+        if let contentRoot {
+            NSLayoutConstraint.activate([
+                banner.centerXAnchor.constraint(equalTo: contentRoot.centerXAnchor),
+                banner.topAnchor.constraint(equalTo: contentRoot.topAnchor, constant: 16),
+                banner.widthAnchor.constraint(lessThanOrEqualTo: contentRoot.widthAnchor, multiplier: 0.8),
+            ])
+        }
+        self.failureBanner = banner
+
         let autoHide = AutoHideController()
         // impl: CTRL-001 rules 4-5 — fade in 150 ms, out 300 ms.
         autoHide.onVisibilityChange = { visible in
@@ -312,6 +337,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hud.onRelease = { autoHide.release($0) }
         readout.onSuppress = { autoHide.suppress($0) }
         readout.onRelease = { autoHide.release($0) }
+        banner.onSuppress = { autoHide.suppress($0) }
+        banner.onRelease = { autoHide.release($0) }
         // impl: LIST-002 rule 4 — the HUD must not hide out from under an open
         // list; the reason is logged, not merely a boolean.
         panel.onSuppress = { autoHide.suppress($0) }
@@ -425,27 +452,56 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.terminate(nil)
     }
 
-    /// impl: MEDIA-002 rule 7 — media failures are a banner, not a modal.
-    /// The banner view is CTRL-001 work; until it exists the failure is logged
-    /// and the window returns to the empty state, which MEDIA-002 rule 8 requires.
-    private func reportFailure(_ failure: MediaFailure, _ url: URL) {
+    /// impl: MEDIA-002 rule 6 — the one place `.encounteredError` becomes an
+    /// observable failure: libvlc's own async decode error, distinct from
+    /// FileOpener's synchronous preflight checks. PlaybackState stays
+    /// URL-unaware by design, so the failing item's identity is read from
+    /// `Queue` here, the only place that already owns it.
+    private func handleEncounteredError() {
+        guard let index = queue.currentIndex, let url = queue.current?.url else { return }
         log(.mediaOpenFailed, .error, [
-            "reason": failure.reason,
-            "message": failure.message(forExtension: url.pathExtension),
-            "presented": "log",
+            "reason": MediaFailure.decodeFailed.reason,
+            "redactedName": PathRedactor.redact(url),
+            "timedOut": false,
         ])
+        reportMediaFailure(.decodeFailed, url, coalesce: true)
+        advancer?.skipFailed(at: index)
+    }
+
+    /// impl: MEDIA-002 rules 7, 10 — presents the banner, or — for a queue
+    /// cascade — buffers until the synchronous run of failures is known to
+    /// have exhausted the whole queue or not. `QueueAdvancer.skipFailed`'s
+    /// cascade is fully synchronous (each failure loads the next item within
+    /// the same call stack), and `onAllItemsFailed` — wired to
+    /// `queueFullyFailed = true` below — always fires strictly after every
+    /// individual failure in that stack, so deferring one run-loop turn lets
+    /// the flush see whether it happened before deciding what to show.
+    private func reportMediaFailure(_ failure: MediaFailure, _ url: URL, coalesce: Bool) {
+        guard coalesce, advancer?.hasQueue == true else {
+            failureBanner?.present(failure, for: url)
+            return
+        }
+        pendingQueueFailures.append((failure, url))
+        guard !queueFlushScheduled else { return }
+        queueFlushScheduled = true
+        DispatchQueue.main.async { [weak self] in self?.flushQueueFailures() }
     }
 
     /// impl: LIST-001 rule 8 / MEDIA-002 rule 10 — when *every* item failed the
-    /// user gets one summary, not one report per item. Like `reportFailure`,
-    /// this is a log entry until the banner view (CTRL-001) exists; the wording
-    /// is the banner's, so the two cannot drift apart when it does.
+    /// user gets one summary banner, not one per item.
     private func reportQueueExhausted() {
-        log(.mediaOpenFailed, .error, [
-            "reason": "allItemsFailed",
-            "message": "None of those \(queue.items.count) files could be played",
-            "presented": "log",
-        ])
+        queueFullyFailed = true
+    }
+
+    private func flushQueueFailures() {
+        queueFlushScheduled = false
+        defer { pendingQueueFailures.removeAll(); queueFullyFailed = false }
+        guard !pendingQueueFailures.isEmpty else { return }
+        if queueFullyFailed {
+            failureBanner?.presentSummary(count: queue.items.count)
+        } else if let last = pendingQueueFailures.last {
+            failureBanner?.present(last.0, for: last.1)
+        }
     }
 
     // MARK: - Termination

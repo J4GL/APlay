@@ -29,12 +29,15 @@ final class FileOpener {
     /// a failure marks the right row and the skip continues from there.
     private var loadingIndex: Int?
 
+    /// impl: MEDIA-002 rule 9 — the 15 s `.opening` watchdog for the item
+    /// currently loading.
+    private let openTimeout: OpenTimeout
+
     /// The reason that queued the current batch, carried onto every item it
     /// contains: an auto-advance within a dropped folder is still a drop.
     private var batchReason: Reason = .commandLine
 
-    /// Set by AppDelegate; presents MEDIA-002's failure banner. Until CTRL-001
-    /// exists the handler logs and returns to the empty state (MEDIA-002 rule 8).
+    /// impl: MEDIA-002 rule 7 — set by AppDelegate to present the failure banner.
     var onFailure: ((MediaFailure, URL) -> Void)?
 
     /// impl: TRACK-001 rules 9-10 — set by AppDelegate; the sole owner of
@@ -45,6 +48,10 @@ final class FileOpener {
         self.player = player
         self.state = state
         self.queue = queue
+        self.openTimeout = OpenTimeout(state: state)
+        openTimeout.onTimeout = { [weak self] url, index in
+            self?.failFromTimeout(url: url, index: index)
+        }
     }
 
     /// impl: MEDIA-001 rule 6 — every route lands here.
@@ -118,6 +125,7 @@ final class FileOpener {
     }
 
     private func openSingle(_ url: URL, reason: Reason) {
+        openTimeout.disarm()
         if let failure = preflight(url) {
             fail(failure, url)
             return
@@ -139,6 +147,7 @@ final class FileOpener {
             return
         }
         state.transition(to: .opening)
+        openTimeout.arm(url: url, index: loadingIndex ?? -1)
         player.play()
         log(.mediaOpenOk, .info, ["mrlHash": PathRedactor.mrlHash(url), "reason": reason.rawValue])
         // The item is loaded, so a later, unrelated failure must not be
@@ -162,11 +171,15 @@ final class FileOpener {
     }
 
     /// impl: MEDIA-002 rule 8 — a failure never leaves a half-open state.
-    private func fail(_ failure: MediaFailure, _ url: URL) {
+    /// impl: MEDIA-002 rule 9 — `timedOut`/`index` let a timeout-sourced
+    /// failure share every bit of this logic with an ordinary one; `index` is
+    /// needed because a timeout fires long after `loadingIndex` was cleared.
+    private func fail(_ failure: MediaFailure, _ url: URL, timedOut: Bool = false, index: Int? = nil) {
+        openTimeout.disarm()
         log(.mediaOpenFailed, .error, [
             "reason": failure.reason,
             "redactedName": PathRedactor.redact(url),
-            "timedOut": false,
+            "timedOut": timedOut,
         ])
         state.transition(to: .idle)
         onFailure?(failure, url)
@@ -174,10 +187,17 @@ final class FileOpener {
         // impl: LIST-001 rule 8 — a broken item is skipped, not fatal. The
         // index is cleared first: `skipFailed` loads the next item, which sets
         // its own, and a failure there must not re-mark this row.
-        if let index = loadingIndex {
-            loadingIndex = nil
-            advancer?.skipFailed(at: index)
+        let queueIndex = index ?? loadingIndex
+        if let queueIndex, queueIndex >= 0 {
+            if index == nil { loadingIndex = nil }
+            advancer?.skipFailed(at: queueIndex)
         }
+    }
+
+    /// impl: MEDIA-002 rule 9 — the 15 s watchdog's own entry point into the
+    /// shared failure path.
+    private func failFromTimeout(url: URL, index: Int) {
+        fail(.decodeFailed, url, timedOut: true, index: index)
     }
 
     /// impl: MEDIA-001 rule 7 — released when the item leaves.

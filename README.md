@@ -5,9 +5,6 @@ A borderless, minimalist video player for macOS, built directly on **libvlc**.
 No titlebar. No traffic lights. No menus over the picture. Just the film, in a window shaped like
 it, with controls that fade in when you move the mouse and disappear when you don't.
 
-> **Status: implemented through CTRL-004 / PREF-001.** 26 specs, lint-clean; the player builds,
-> signs and plays. See [Project status](#project-status) for what is still unbuilt.
-
 ## Why libvlc
 
 VLC's decoding stack is the reason this exists rather than being a thin wrapper over AVKit. It plays
@@ -80,7 +77,8 @@ Running them needs the XCTest/XCUITest runners, which ship only with full Xcode 
 | Platform, window, media, playback, tracks, queue, HUD | **built** |
 | Menu bar (CTRL-004), language preferences (PREF-001), drag-anywhere (WIN-001 r9) | **built** |
 | Aspect-ratio lock — resizing never changes the picture's shape (WIN-003 r5, r13-15) | **built** |
-| Resume position (PLAY-004), failure banner (MEDIA-002 r7) | not started |
+| Failure banner (MEDIA-002 r7, r9-11) | **built** |
+| Resume position (PLAY-004) | not started |
 | Opening size and geometry persistence (WIN-003 r3-4, r8-11) | not started |
 | Notarised distribution (NOTARY-001) | **built** — signed, notarized, stapled DMG on [GitHub Releases](https://github.com/J4GL/APlay/releases) |
 

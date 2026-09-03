@@ -17,9 +17,18 @@ final class AspectRatioLock {
     private(set) var lockedRatio: CGFloat?
     private(set) var isSuspended = false
 
-    init(window: NSWindow, player: MediaPlayer) {
+    /// impl: WIN-003 rules 3-4 — the very first vout of the window's lifetime
+    /// takes the opening-size path; every later one (a new queue item with a
+    /// different ratio) keeps the existing rule-6 reshape-around-centre path.
+    private var hasSizedInitially = false
+    /// impl: WIN-003 rule 4 — "unless a saved geometry applies": a restored
+    /// frame is never resized to fit the video, only ratio-locked.
+    private let didRestoreGeometry: Bool
+
+    init(window: NSWindow, player: MediaPlayer, didRestoreGeometry: Bool = false) {
         self.window = window
         self.player = player
+        self.didRestoreGeometry = didRestoreGeometry
     }
 
     // MARK: - The video's shape
@@ -49,8 +58,17 @@ final class AspectRatioLock {
         lockedRatio = ratio
         guard !unchanged else { return }
 
-        let applied = isSuspended ? window.contentRect(forFrameRect: window.frame).size
-                                  : apply(ratio: ratio)
+        let applied: NSSize
+        if isSuspended {
+            applied = window.contentRect(forFrameRect: window.frame).size
+        } else if !hasSizedInitially, !didRestoreGeometry {
+            // impl: WIN-003 rule 3 — the opening fit-to-video size, once, only
+            // when nothing was restored (rule 4).
+            applied = applyInitialSize(geometry)
+        } else {
+            applied = apply(ratio: ratio)
+        }
+        hasSizedInitially = true
 
         // impl: WIN-003 rule 12 — the pixel size *and* the SAR it was combined
         // with, because the two together are what WIN-003-S1 discriminates.
@@ -85,6 +103,29 @@ final class AspectRatioLock {
         let frameSize = window.frameRect(forContentRect: NSRect(origin: .zero, size: content)).size
         var frame = VideoGeometry.recentred(window.frame, toFrameSize: frameSize)
         if let visible { frame = VideoGeometry.nudgedInside(frame, visibleFrame: visible) }
+        window.setFrame(frame, display: true, animate: false)
+        return content
+    }
+
+    /// impl: WIN-003 rule 3 — the opening fit-to-video size, applied once.
+    /// Re-centres the fitted size on the window's *current* centre, which
+    /// `AppDelegate.buildWindow` already placed on the cursor's screen (rule
+    /// 4) — no second screen/cursor lookup needed here.
+    @discardableResult
+    private func applyInitialSize(_ geometry: VideoGeometry) -> NSSize {
+        let ratio = geometry.displayAspectRatio
+        window.contentAspectRatio = NSSize(width: ratio, height: 1)
+        window.contentMinSize = VideoGeometry.minimumContentSize(ratio: ratio)
+
+        guard let screen = window.screen ?? NSScreen.main else {
+            // No screen at all is not a real-world case, but leaves the
+            // window exactly as it was rather than crashing on a force-unwrap.
+            return window.contentRect(forFrameRect: window.frame).size
+        }
+        let content = geometry.initialContentSize(fitting: screen)
+        let frameSize = window.frameRect(forContentRect: NSRect(origin: .zero, size: content)).size
+        var frame = VideoGeometry.recentred(window.frame, toFrameSize: frameSize)
+        frame = VideoGeometry.nudgedInside(frame, visibleFrame: screen.visibleFrame)
         window.setFrame(frame, display: true, animate: false)
         return content
     }

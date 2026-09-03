@@ -89,4 +89,35 @@ struct VideoGeometry: Equatable {
         if moved.minY < visibleFrame.minY { moved.origin.y = visibleFrame.minY }
         return moved
     }
+
+    /// impl: WIN-003 rule 3 — the opening content size: preserves `dar`, never
+    /// upscales past the video's own pixel size, fits within 85 % of the
+    /// screen's `visibleFrame` on both axes, and never drops below rule 13's
+    /// 320 x 180 floor (which wins outright, ratio honoured on the longer
+    /// axis, when the floor and the two ceilings above cannot all be met).
+    func initialContentSize(fitting screen: NSScreen) -> NSSize {
+        let ratio = displayAspectRatio
+        guard ratio.isFinite, ratio > 0 else { return Self.unlockedMinimum }
+
+        // impl: WIN-003 rule 3 — "at most 100 % of the video's native pixel
+        // size". `pixelSize.width` is *storage* width; on anamorphic content
+        // (SAR != 1) the displayed width differs, so the 100 % cap is derived
+        // at the display ratio, full native height.
+        let ceiling100 = NSSize(width: pixelSize.height * ratio, height: pixelSize.height)
+        let ceiling85 = NSSize(width: screen.visibleFrame.width * 0.85,
+                               height: screen.visibleFrame.height * 0.85)
+        let cap = NSSize(width: min(ceiling100.width, ceiling85.width),
+                         height: min(ceiling100.height, ceiling85.height))
+
+        // Largest ratio-preserving size fitting inside `cap` — same
+        // from-height/from-width candidate shape `minimumContentSize` uses.
+        let fromHeight = NSSize(width: (cap.height * ratio).rounded(.down), height: cap.height.rounded(.down))
+        let fitted = fromHeight.width <= cap.width
+            ? fromHeight
+            : NSSize(width: cap.width.rounded(.down), height: (cap.width / ratio).rounded(.down))
+
+        let floor = Self.minimumContentSize(ratio: ratio)
+        guard fitted.width >= floor.width, fitted.height >= floor.height else { return floor }
+        return fitted
+    }
 }

@@ -21,6 +21,11 @@ final class WindowGeometryLog: NSObject, NSWindowDelegate {
     /// corner-radius animation. This class stays the window's only delegate.
     var fullscreen: FullscreenController?
 
+    /// impl: WIN-003 rule 8 — set by AppDelegate; every settled move/resize
+    /// schedules a debounced save, skipped while fullscreen (that frame
+    /// covers the whole screen and is not a real windowed state to restore).
+    var store: WindowGeometryStore?
+
     /// impl: WIN-001 rule 14 — logged once at creation.
     ///
     /// The style mask is reported because rule 1 makes claims about it that
@@ -40,11 +45,18 @@ final class WindowGeometryLog: NSObject, NSWindowDelegate {
     func windowDidMove(_ notification: Notification) {
         guard let window = notification.object as? NSWindow else { return }
         coalesce(&lastMoveLog, event: .windowMoved, window: window)
+        scheduleSaveIfWindowed(window)
     }
 
     func windowDidResize(_ notification: Notification) {
         guard let window = notification.object as? NSWindow else { return }
         coalesce(&lastResizeLog, event: .windowResized, window: window)
+        scheduleSaveIfWindowed(window)
+    }
+
+    private func scheduleSaveIfWindowed(_ window: NSWindow) {
+        guard fullscreen?.isFullscreen != true else { return }
+        store?.scheduleSave(window.frame)
     }
 
     func windowDidBecomeKey(_ notification: Notification) {

@@ -9,6 +9,12 @@ import PlayA11y
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let state = PlaybackState()
     private let geometryLog = WindowGeometryLog()
+    /// impl: WIN-003 rules 8-11 — the window-frame store; construction alone
+    /// never touches AppKit, so it is safe this early.
+    private let geometryStore = WindowGeometryStore()
+    /// impl: WIN-003 rule 4 — whether `buildWindow` restored a saved frame,
+    /// read by `buildEngine` when constructing `AspectRatioLock`.
+    private var didRestoreGeometry = false
     /// impl: LIST-001 rule 2 — session state, owned here and never persisted.
     private let queue = Queue()
 
@@ -85,9 +91,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Window
 
-    /// impl: WIN-001 rules 1-6 — created once, here and nowhere else.
+    /// impl: WIN-001 rules 1-6 · WIN-003 rules 4, 9 — created once, here and
+    /// nowhere else. A saved geometry restores position *and* size directly
+    /// (rule 4's "unless a saved geometry applies"); otherwise the default
+    /// 960 x 540 rect is centred on the screen containing the cursor.
     private func buildWindow() {
-        let initial = NSRect(x: 0, y: 0, width: 960, height: 540)
+        let restored = geometryStore.restore()
+        didRestoreGeometry = restored != nil
+        let initial = restored ?? NSRect(x: 0, y: 0, width: 960, height: 540)
         let window = BorderlessWindow(contentRect: initial)
 
         let root = ContentRootView(frame: initial)
@@ -102,8 +113,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         WindowShapeController.applyCornerRadius(WindowShapeController.cornerRadius, to: root)
 
         geometryLog.onWindowWillClose = { NSApp.terminate(nil) }
+        geometryLog.store = geometryStore
         window.delegate = geometryLog
-        window.center()
+        if let restored {
+            window.setFrame(restored, display: false)
+        } else {
+            // impl: WIN-003 rule 4 — centred on the screen containing the
+            // mouse cursor at open time, not always the main screen.
+            window.setFrame(Self.centeredOnCursorScreen(initial.size), display: false)
+        }
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         geometryLog.logCreated(window)
@@ -111,6 +129,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.window = window
         self.contentRoot = root
         self.videoView = video
+    }
+
+    /// impl: WIN-003 rule 4 — mirrors `NSWindow.center()`'s own math, targeting
+    /// the screen under the mouse instead of always the main screen.
+    private static func centeredOnCursorScreen(_ size: NSSize) -> NSRect {
+        let cursor = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first { $0.frame.contains(cursor) } ?? NSScreen.main
+        guard let frame = screen?.visibleFrame else {
+            return NSRect(origin: .zero, size: size)
+        }
+        return NSRect(x: frame.midX - size.width / 2, y: frame.midY - size.height / 2,
+                      width: size.width, height: size.height)
     }
 
     // MARK: - Engine
@@ -210,7 +240,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // impl: WIN-003 rules 1, 5, 14 — the window takes the video's shape at
         // the first vout, keeps it through every resize, and lets go of it for
         // the duration of fullscreen.
-        let aspectRatio = AspectRatioLock(window: window, player: player)
+        let aspectRatio = AspectRatioLock(window: window, player: player,
+                                          didRestoreGeometry: didRestoreGeometry)
         state.onVoutChanged = { aspectRatio.videoDidAppear() }
         fullscreen.aspectRatio = aspectRatio
 
@@ -548,6 +579,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         state.releaseSleepAssertionForTermination()
         resumeCoordinator?.saveCurrent(reason: "terminate")
+        // impl: WIN-003 rule 8 — skip a fullscreen frame; it covers the whole
+        // screen and is not a real windowed state to restore into.
+        if let window, fullscreen?.isFullscreen != true {
+            geometryStore.save(window.frame)
+        }
         opener?.shutdown()
         player?.shutdown()
         VLCRuntime.shared.shutdown()

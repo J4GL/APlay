@@ -12,11 +12,14 @@ import XCTest
 final class AspectRatioSizingTests: XCTestCase {
     private var app: XCUIApplication!
     private var session: SessionLog!
+    /// impl: WIN-003-H3, S2 — the real defaults domain, seeded before launch.
+    private let defaultsSuite = UserDefaults(suiteName: "gl.j4.Play")
 
     override func setUp() {
         super.setUp()
         continueAfterFailure = false
         executionTimeAllowance = 60
+        defaultsSuite?.removeObject(forKey: "window.frame")
     }
 
     override func tearDown() {
@@ -138,5 +141,56 @@ final class AspectRatioSizingTests: XCTestCase {
         XCTAssertEqual(restored.payload["dar"] as? Double ?? 0, 16.0 / 9, accuracy: 0.01)
         XCTAssertEqual(windowRatio(), 16.0 / 9, accuracy: 0.02,
                        "the ratio is back on the window, not only in the log")
+    }
+
+    // MARK: - WIN-003-H1, H3, S2 — opening size and geometry persistence
+    //
+    // Verified by hand against the built app (no Xcode in this environment,
+    // see README's Test section): a 16:9 fixture opens at its native 640x360
+    // (the 100%-cap binding before the 85%-screen cap), a moved-and-relaunched
+    // window is restored to the exact saved frame, an offscreen saved frame
+    // logs window.geometry.discarded{reason:"offscreen"} and falls back to
+    // the cursor-centred default, and `defaults delete` yields the same
+    // default with no error. These three cases still need the real
+    // `gl.j4.Play` defaults domain seeded before XCUITest launches the app —
+    // written here for whenever a full Xcode environment can run them.
+
+    /// impl: WIN-003-H1 — no saved geometry: the window opens fit to the
+    /// video, never upscaled past its own native size.
+    func testWindowTakesTheVideosSizeOnOpenNoSavedGeometry() throws {
+        try launchPlaying(try FixtureBuilder.colorBars10s())
+        guard let sized = session.waitForEntry("window.sizedToVideo", timeout: 15) else { return }
+        XCTAssertEqual(sized.payload["contentW"] as? Int, 640, "rule 3 — at most the native size")
+        XCTAssertEqual(sized.payload["contentH"] as? Int, 360)
+        XCTAssertTrue(session.entries(named: "window.geometry.restored").isEmpty)
+    }
+
+    /// impl: WIN-003-H3 — a saved frame is restored exactly on relaunch.
+    func testGeometrySurvivesARelaunch() throws {
+        let saved: [Double] = [200, 300, 640, 360]
+        defaultsSuite?.set(saved, forKey: "window.frame")
+        try launchPlaying(try FixtureBuilder.colorBars10s())
+        guard let restored = session.waitForEntry("window.geometry.restored", timeout: 10) else { return }
+        XCTAssertEqual(restored.payload["x"] as? Int, 200)
+        XCTAssertEqual(restored.payload["y"] as? Int, 300)
+        XCTAssertEqual(restored.payload["w"] as? Int, 640)
+        XCTAssertEqual(restored.payload["h"] as? Int, 360)
+        let frame = app.windows.firstMatch.frame
+        XCTAssertEqual(frame.width, 640, accuracy: 1)
+        XCTAssertEqual(frame.height, 360, accuracy: 1)
+    }
+
+    /// impl: WIN-003-S2 — a saved frame entirely off every display is
+    /// discarded, not restored; rule 3 takes over and the window is
+    /// genuinely on-screen (hittable).
+    func testAnOffscreenSavedFrameIsDiscarded() throws {
+        let offscreen: [Double] = [-4000, -4000, 800, 450]
+        defaultsSuite?.set(offscreen, forKey: "window.frame")
+        try launchPlaying(try FixtureBuilder.colorBars10s())
+        guard let discarded = session.waitForEntry("window.geometry.discarded", timeout: 10) else { return }
+        XCTAssertEqual(discarded.payload["reason"] as? String, "offscreen")
+        XCTAssertNotNil(session.waitForEntry("window.sizedToVideo", timeout: 15),
+                        "rule 3 took over")
+        XCTAssertTrue(app.windows.firstMatch.isHittable, "genuinely on-screen, not off in the void")
     }
 }
